@@ -1,6 +1,6 @@
 # simulate_diffusion_1d.py
 
-# Copyright (c) 2020-2021, Christoph Gohlke
+# Copyright (c) 2020-2024, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -60,7 +60,7 @@ Some of the functions used in the first part of the simulation code:
 
 * [`numpy.mean(array, axis)`](
   https://numpy.org/doc/stable/reference/generated/numpy.mean.html)
-  returns the avarage of the elements along axis.
+  returns the average of the elements along axis.
 
 * [`numpy.arange(stop)`](
   https://numpy.org/doc/stable/reference/generated/numpy.arange.html)
@@ -69,7 +69,7 @@ Some of the functions used in the first part of the simulation code:
 * [`numpy.linalg.lstsq(a, b)`](
   https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html)
   returns the least-squares solution to a linear matrix equation, i.e. it
-  computes the vector `x` that approximatively solves the equation `a @ x = b`.
+  computes the vector `x` that approximately solves the equation `a @ x = b`.
 
 * [`array[..., numpy.newaxis]`](
   https://numpy.org/doc/stable/reference/constants.html#numpy.newaxis)
@@ -121,7 +121,6 @@ directions[diffusion_speed : diffusion_speed * 2] = -1
 # TODO: this loop could be vectorized, i.e. below calculations could be done
 # for all particles at once.
 for particle in range(particles):
-
     # Get a random number between 0 and `sampling_period`
     # for all sampling periods in the duration of the simulation.
     random_numbers = numpy.random.randint(sampling_period, size=duration)

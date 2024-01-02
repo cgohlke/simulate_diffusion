@@ -1,6 +1,6 @@
 # simulate_diffusion.py
 
-# Copyright (c) 2020-2021, Christoph Gohlke
+# Copyright (c) 2020-2024, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,10 +32,9 @@
 # %% [markdown]
 """# Simulate diffusion on a grid using Python
 
-by [Christoph Gohlke](https://www.lfd.uci.edu/~gohlke/),
-Laboratory for Fluorescence Dynamics, University of California, Irvine
+by [Christoph Gohlke](https://www.cgohlke.com/)
 
-Updated on March 21, 2021
+Updated on January 2, 2024
 
 This notebook is released under the BSD 3-Clause license.
 
@@ -78,14 +77,12 @@ Import libraries and modules used in this document:
 import copy
 import math
 
-import numpy
+import ipywidgets
+import matplotlib
 import numba
-
+import numpy
 from matplotlib import pyplot
 from mpl_toolkits.mplot3d import Axes3D
-
-import ipywidgets
-
 
 # %% [markdown]
 """
@@ -307,7 +304,6 @@ def example_nd_simulations():
 
     # iterate over dimensions 1 to 3
     for dimensions in range(1, 4):
-
         # define simulation parameters
         simulation_args = {
             'dimensions': dimensions,
@@ -508,7 +504,7 @@ the observation volume over time and the MSD over time are plotted.
 
 
 # %%
-@numba.jit
+@numba.jit(nopython=True)
 def diffusion_model_raft(random_moves, raft_shape, raft_delay):
     """Membrane raft diffusion model."""
     positions = random_moves.copy()
@@ -601,7 +597,7 @@ as a series of color-coded 2D images using interactive Jupyter widgets.
 
 
 # %%
-@numba.jit
+@numba.jit(nopython=True)
 def _histogram_zr(positions, axes=(0, 1, 2)):
     """Return (z, r) histograms of particles over duration of simulation."""
     number_particles, duration, dimensions = positions.shape
@@ -643,7 +639,7 @@ def plot_histogram_zr(positions, axes=(0, 1, 2)):
     norm = _histogram_zr_norm(hist.shape[-1])
     hist = numpy.log10(numpy.where(hist > 0.0, hist, numpy.nan) / norm)
 
-    cmap = copy.copy(pyplot.cm.get_cmap('bwr'))
+    cmap = copy.copy(matplotlib.colormaps.get_cmap('bwr'))
     cmap.set_bad(color='black')
     vmax = math.log10(number_particles)
 
@@ -981,7 +977,7 @@ def _scanning_circular(position, shape, samples, axes):
     return positions
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _scanning_integrate(
     positions,
     scan_positions,
@@ -1045,7 +1041,7 @@ def _photon_counter(
     intensities, offset=0.0, gain=1.0, gamma=1.0, bitdepth=32, poisson=True
 ):
     """Return Poisson distributed, digitized intensities."""
-    max_int = 2 ** bitdepth - 1
+    max_int = 2**bitdepth - 1
     signal = intensities.astype(numpy.float64)
     signal -= offset
     signal *= gain
@@ -1146,7 +1142,6 @@ def example_scan_positions():
     scanning_axes = (-3, -2, -1)
 
     for scanning_mode in ('point', 'line', 'circle', 'image', 'volume'):
-
         dimensions = {
             'circle': 0,
             'point': 0,
@@ -1236,7 +1231,7 @@ def example_point_fcs():
 
     simulation_args = {
         'dimensions': 3,
-        'duration': 2 ** 15,
+        'duration': 2**15,
         'sampling_period': 1000,
     }
 
@@ -1375,7 +1370,7 @@ def detector_camera(
     )
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _detector_camera(
     positions,
     intensities,
@@ -1512,13 +1507,14 @@ Print information about the software used to generate this document.
 # %%
 def system_info():
     """Return information about Python and libraries."""
-    import sys
     import datetime
-    import numpy
-    import numba
+    import sys
+
+    import ipywidgets
     import matplotlib
     import notebook
-    import ipywidgets
+    import numba
+    import numpy
     import widgetsnbextension
 
     return '\n'.join(
