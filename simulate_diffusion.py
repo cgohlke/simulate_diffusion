@@ -1,6 +1,6 @@
 # simulate_diffusion.py
 
-# Copyright (c) 2020-2024, Christoph Gohlke
+# Copyright (c) 2020-2025, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@
 
 by [Christoph Gohlke](https://www.cgohlke.com/)
 
-Updated on January 2, 2024
+Published July, 2020. Last updated December 16, 2025.
 
 This notebook is released under the BSD 3-Clause license.
 
@@ -82,7 +82,8 @@ import matplotlib
 import numba
 import numpy
 from matplotlib import pyplot
-from mpl_toolkits.mplot3d import Axes3D
+
+rng = numpy.random.default_rng(12345678)  # random number generator
 
 # %% [markdown]
 """
@@ -140,7 +141,7 @@ def simulate_diffusion(
 
     # get a random number between 0 and `sampling_period`
     # for all particles and sampling periods in the duration of the simulation
-    random_numbers = numpy.random.randint(
+    random_numbers = rng.integers(
         sampling_period, size=(number_particles, duration)
     )
 
@@ -157,9 +158,7 @@ def simulate_diffusion(
 
     # calculate the positions of particles from the random moves using a
     # hook function
-    positions = diffusion_model(random_moves, **diffusion_model_args)
-
-    return positions
+    return diffusion_model(random_moves, **diffusion_model_args)
 
 
 def positions_init_origin(random_moves):
@@ -183,9 +182,13 @@ def particle_counter_box(positions, counter_shape=None, counter_position=None):
         counter_shape = (1,) * dimensions  # one element
     if counter_position is None:
         counter_position = (0,) * dimensions  # center
-    lower = tuple(p - s // 2 for p, s in zip(counter_position, counter_shape))
+    lower = tuple(
+        p - s // 2
+        for p, s in zip(counter_position, counter_shape, strict=True)
+    )
     upper = tuple(
-        p + s // 2 + s % 2 for p, s in zip(counter_position, counter_shape)
+        p + s // 2 + s % 2
+        for p, s in zip(counter_position, counter_shape, strict=True)
     )
     in_box = numpy.all((positions >= lower) & (positions < upper), axis=-1)
     particle_counts = numpy.sum(in_box, axis=0)
@@ -223,7 +226,9 @@ def plot_positions(positions, selection=None, ax=None, title=None, label=None):
         ax.set_xlabel('time')
         ax.set_ylabel('position')
         label = '' if label is None else label + ' '
-        for i, dim in zip(range(dimensions - 1, -1, -1), 'xyzwvuts'):
+        for i, dim in zip(
+            range(dimensions - 1, -1, -1), 'xyzwvuts', strict=False
+        ):
             ax.plot(time, positions[selection, :, i], label=label + dim)
     elif dimensions == 1:
         time = numpy.arange(duration)
@@ -295,7 +300,6 @@ def plot_particle_counts(particle_counts, ax=None, label=None):
 
 def example_nd_simulations():
     """Compare diffusion in 1, 2, and 3 dimensions."""
-
     # create three empty plots
     plots = []
     for _ in range(3):
@@ -417,7 +421,6 @@ def diffusion_model_box_absorbing(random_moves, box_shape):
 
 def example_box_model_simulations(dimensions=3):
     """Compare box diffusion models."""
-
     # define simulation parameters
     box_model_args = {'box_shape': (20,) * dimensions}
 
@@ -539,7 +542,6 @@ def diffusion_model_raft(random_moves, raft_shape, raft_delay):
 
 def example_raft_simulation():
     """Run simulation of membrane raft model."""
-
     raft_model_args = {'raft_shape': (2, 10), 'raft_delay': 20}
 
     simulation_args = {
@@ -736,9 +738,11 @@ def positions_init_uniform(random_moves, init_shape=None, init_position=None):
     if init_position is None:
         init_position = (0,) * dimensions  # center
     if init_shape is None:
-        init_position = (256,) * dimensions  # box
-    for dim, (pos, size) in enumerate(zip(init_position, init_shape)):
-        temp = numpy.random.randint(0, size, number_particles)
+        init_shape = (256,) * dimensions  # box
+    for dim, (pos, size) in enumerate(
+        zip(init_position, init_shape, strict=True)
+    ):
+        temp = rng.integers(0, size, number_particles)
         temp += pos - size // 2
         random_moves[:, 0, dim] = temp
 
@@ -750,7 +754,6 @@ def positions_init_array(random_moves, init_positions):
 
 def example_particle_type_simulations():
     """Compare diffusion of different and combined particle types."""
-
     particle_type_0 = [
         {
             'number_particles': 1000,
@@ -791,6 +794,7 @@ def example_particle_type_simulations():
     for particle_types, label in zip(
         (particle_type_0, particle_type_1, particle_type_0 + particle_type_1),
         ('type 0', 'type 1', 'type 0 and 1'),
+        strict=True,
     ):
         positions = simulate_diffusion_pt(
             particle_types=particle_types, **simulation_args
@@ -993,7 +997,7 @@ def _scanning_integrate(
     for i in range(dimensions):
         duration += intervals[-i - 1] * (scan_positions.shape[-i - 1] - 1)
     periods = (positions.shape[1] + interval) // (duration + interval)
-    shape = (periods,) + scan_positions.shape[:-1]
+    shape = (periods, *scan_positions.shape[:-1])
     intensities = numpy.empty(shape, dtype=numpy.float64)
     intensities_ = intensities.flat
     scan_times = numpy.empty(intensities.size, dtype=numpy.float64)
@@ -1001,7 +1005,7 @@ def _scanning_integrate(
     psf_shape_2 = (psf_shape[0] // 2, psf_shape[1] // 2, psf_shape[2] // 2)
     sample = 0
     time = 0
-    for volume in range(shape[0]):
+    for _volume in range(shape[0]):
         for image in range(shape[1]):
             for line in range(shape[2]):
                 for pixel in range(shape[3]):
@@ -1011,7 +1015,7 @@ def _scanning_integrate(
                     sy -= psf_shape_2[1]
                     sx -= psf_shape_2[2]
                     si = 0.0
-                    for m in range(dwelltime):
+                    for _m in range(dwelltime):
                         for particle in range(positions.shape[0]):
                             pz = positions[particle, time, 0] - sz
                             py = positions[particle, time, 1] - sy
@@ -1038,7 +1042,7 @@ def _scanning_integrate(
 
 
 def _photon_counter(
-    intensities, offset=0.0, gain=1.0, gamma=1.0, bitdepth=32, poisson=True
+    intensities, offset=0.0, gain=1.0, gamma=1.0, bitdepth=32, *, poisson=True
 ):
     """Return Poisson distributed, digitized intensities."""
     max_int = 2**bitdepth - 1
@@ -1050,7 +1054,7 @@ def _photon_counter(
         numpy.power(signal, 1 / gamma, out=signal)
         signal *= max_int
     if poisson:
-        signal = numpy.random.poisson(signal)
+        signal = rng.poisson(signal)
         numpy.clip(signal, 0, max_int, out=signal)
     else:
         eps = numpy.finfo(numpy.float64).eps * 2
@@ -1225,7 +1229,6 @@ def plot_pch(pch, bins, ax=None, label=None):
 
 def example_point_fcs():
     """Laser scanning example."""
-
     # physical_size = 0.05  # micrometer per pixel
     # physical_time = 1.0  # microseconds per sampling period
 
@@ -1296,8 +1299,7 @@ def example_point_fcs():
     plot_pch(pch, pch_bins)
 
 
-# %time
-example_point_fcs()
+# %time example_point_fcs()
 
 
 # %% [markdown]
@@ -1380,7 +1382,7 @@ def _detector_camera(
     binning=(1, 1),
     axes=(-2, -1),
 ):
-    """ """
+    """Return time series of 2D intensity images."""
     yax, xax = axes
     ymin = position[0] - shape[0] // 2
     ymax = position[0] + shape[0] // 2 + shape[0] % 2
@@ -1417,7 +1419,6 @@ def excitation_ambient(positions, particle_types, ambient_intensity=1.0):
 
 def example_detector_types():
     """Compare detector types."""
-
     simulation_args = {
         'dimensions': 3,
         'duration': 2000,

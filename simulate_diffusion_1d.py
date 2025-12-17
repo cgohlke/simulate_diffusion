@@ -1,6 +1,6 @@
 # simulate_diffusion_1d.py
 
-# Copyright (c) 2020-2024, Christoph Gohlke
+# Copyright (c) 2020-2025, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -86,8 +86,11 @@ Some of the functions used in the first part of the simulation code:
 """
 
 # %%
-# import the numpy array-computing library
+# import the numpy array-computing library and initialize the random number
+# generator
 import numpy
+
+rng = numpy.random.default_rng(12345678)
 
 # Define some variables to control the simulation:
 # number of particles
@@ -123,7 +126,7 @@ directions[diffusion_speed : diffusion_speed * 2] = -1
 for particle in range(particles):
     # Get a random number between 0 and `sampling_period`
     # for all sampling periods in the duration of the simulation.
-    random_numbers = numpy.random.randint(sampling_period, size=duration)
+    random_numbers = rng.integers(sampling_period, size=duration)
 
     # Index the first axis in the `directions` look-up-table with the random
     # numbers to obtain the relative moves of the particle for all sampling
