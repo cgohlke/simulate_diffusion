@@ -1,6 +1,6 @@
 # simulate_diffusion.py
 
-# Copyright (c) 2020-2025, Christoph Gohlke
+# Copyright (c) 2020-2026, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,14 +34,17 @@
 
 by [Christoph Gohlke](https://www.cgohlke.com/)
 
-Published July, 2020. Last updated December 16, 2025.
+Published July, 2020. Last updated February 25, 2026.
 
 This notebook is released under the BSD 3-Clause license.
+
+Source code is available on [GitHub](
+https://github.com/cgohlke/simulate_diffusion).
 
 ## References
 
 This [Jupyter Notebook](https://jupyter.org/) uses the
-[Python 3](https://www.python.org) programming language, the
+[Python](https://www.python.org) programming language, the
 [numpy](https://numpy.org/) library for n-dimensional array-programming and
 linear algebra, the
 [numba](https://numba.pydata.org/) Python compiler, and the
@@ -89,12 +92,26 @@ rng = numpy.random.default_rng(12345678)  # random number generator
 """
 ## Diffusion on a n-dimensional grid
 
+In two and three dimensions the same random-walk model applies: at each time
+step a particle moves one grid step along exactly one randomly chosen axis
+(or stays still). The MSD generalises to $n$ dimensions as:
+
+$$MSD(t) = 2nDt$$
+
+where $n$ is the number of spatial dimensions. The diffusion coefficient $D$
+is therefore recovered as $D = \text{slope} \,/\, (2n)$.
+
+The 1D look-up table (LUT) extends naturally: `directions` becomes a 2D array
+of shape `(sampling_period, dimensions)`, where each row is a displacement
+vector such as `[1, 0, 0]`, `[0, -1, 0]`, or `[0, 0, 0]` for no move.
+One random integer per step indexes a row to give the full displacement.
+
 To make the code more modular, manageable, extensible, and reusable, it is
 refactored into small functions for simulation, particle counting,
-analysis, and plotting. The simulation model is extended to handle many
-dimensions. Hook functions allow customizing the initialization and
-restriction of particle movements. A simple detector "particle counter box"
-and methods to analyze and plot particle counts are added.
+analysis, and plotting.
+Hook functions allow customizing the initialization and restriction of
+particle movements. A simple detector "particle counter box" and methods
+to analyze and plot particle counts are added.
 
 Diffusion in one, two, and three dimensions are simulated and compared.
 
@@ -197,7 +214,12 @@ def particle_counter_box(positions, counter_shape=None, counter_position=None):
 
 
 def calculate_msd_d(positions):
-    """Return mean square displacement and D of simulated positions."""
+    """Return mean square displacement and D of simulated positions.
+
+    MSD is computed as displacement squared relative to each particle's
+    initial position, so randomized starting positions are handled correctly.
+
+    """
     number_particles, duration, dimensions = positions.shape
     msd = numpy.mean(
         numpy.square(positions - positions[:, 0:1, :]), axis=(0, -1)
@@ -379,7 +401,7 @@ Hook functions are defined for each case and passed to the simulation function.
 def diffusion_model_box_closed(random_moves, box_shape):
     """Diffusion in a box. Particles cannot leave box."""
     positions = random_moves.copy()  # modify in-place
-    number_particles, duration, dimensions = positions.shape
+    _number_particles, duration, _dimensions = positions.shape
     lower = tuple(-s // 2 for s in box_shape)
     upper = tuple(s // 2 + s % 2 - 1 for s in box_shape)
     for time in range(1, duration):
@@ -392,7 +414,7 @@ def diffusion_model_box_closed(random_moves, box_shape):
 def diffusion_model_box_cyclic(random_moves, box_shape):
     """Diffusion in a box. Particles leaving box enter on opposite side."""
     positions = random_moves.copy()
-    number_particles, duration, dimensions = positions.shape
+    _number_particles, duration, _dimensions = positions.shape
     lower = tuple(-s // 2 for s in box_shape)
     for time in range(1, duration):
         temp = positions[:, time]
@@ -405,7 +427,7 @@ def diffusion_model_box_cyclic(random_moves, box_shape):
 
 def diffusion_model_box_absorbing(random_moves, box_shape):
     """Diffusion in a box. Particles leaving box never re-enter."""
-    number_particles, duration, dimensions = random_moves.shape
+    number_particles, duration, _dimensions = random_moves.shape
     positions = numpy.cumsum(random_moves, axis=1)
     lower = tuple(-s // 2 for s in box_shape)
     upper = tuple(s // 2 + s % 2 for s in box_shape)
@@ -462,7 +484,7 @@ def example_box_model_simulations(dimensions=3):
         )
 
         # count particles
-        particle_counts, particles_counted = particle_counter_box(
+        particle_counts, _particles_counted = particle_counter_box(
             positions, **particle_counter_args
         )
 
@@ -748,7 +770,13 @@ def positions_init_uniform(random_moves, init_shape=None, init_position=None):
 
 
 def positions_init_array(random_moves, init_positions):
-    """Set initial position of particles using positions array."""
+    """Set initial position of particles using positions array.
+
+    `init_positions` must be shaped (N, T, D). The first time step
+    (index 0) is used as the initial position for each particle.
+    Pass `init_positions[:, numpy.newaxis]` for a plain (N, D) array.
+
+    """
     random_moves[:, 0] = init_positions[:, 0]
 
 
@@ -800,7 +828,7 @@ def example_particle_type_simulations():
             particle_types=particle_types, **simulation_args
         )
 
-        particle_counts, particles_counted = particle_counter_box(
+        particle_counts, _particles_counted = particle_counter_box(
             positions, **particle_counter_args
         )
 
@@ -901,7 +929,7 @@ def laser_scanning(
 
     if scanning_mode == 'circle':
         scan_positions = _scanning_circular(
-            scanning_position, scanning_shape, scanning_strides, scanning_axes
+            scanning_position, scanning_shape, scanning_samples, scanning_axes
         )
     else:
         scan_positions = _scanning_raster(
@@ -1333,11 +1361,9 @@ def detector_pmt(
     if pmt_exposure > 1:
         size = intensities.size
         if size % pmt_exposure:
-            intensities = intensities.resize(
-                (size + pmt_exposure - size % pmt_exposure,)
-            )
+            intensities.resize((size + pmt_exposure - size % pmt_exposure,))
         intensities = numpy.sum(
-            intensities.reshape((pmt_exposure, -1)), axis=0
+            intensities.reshape((-1, pmt_exposure)), axis=1
         )
     return _photon_counter(
         intensities, pmt_offset, pmt_gain, pmt_gamma, pmt_bitdepth

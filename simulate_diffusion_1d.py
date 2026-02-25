@@ -1,6 +1,6 @@
 # simulate_diffusion_1d.py
 
-# Copyright (c) 2020-2025, Christoph Gohlke
+# Copyright (c) 2020-2026, Christoph Gohlke
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,8 @@
 
 # %% [markdown]
 """
+## Prerequisites
+
 Some of the functions used in the first part of the simulation code:
 
 * [`range(stop)`](https://docs.python.org/3/library/stdtypes.html#range)
@@ -43,8 +45,8 @@ Some of the functions used in the first part of the simulation code:
   https://numpy.org/doc/stable/reference/generated/numpy.zeros.html)
   returns an array of specified shape and data type, initialized with zeros.
 
-* [`numpy.random.randint(high, size)`](
-  https://numpy.org/doc/stable/reference/random/generated/numpy.random.randint.html)
+* [`numpy.random.Generator.integers(high, size)`](
+  https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.integers.html)
   returns an array of shape "size", initialized with random integers between
   0 and high (excluding).
 
@@ -83,6 +85,53 @@ Some of the functions used in the first part of the simulation code:
 # %% [markdown]
 """
 ## Diffusion on a one-dimensional grid
+"""
+
+# %% [markdown]
+"""
+### Physical background
+
+In Brownian motion, a particle suspended in a fluid is constantly hit
+by solvent molecules, causing it to move in random directions.
+On a discrete grid this is modelled as a random walk: at each time step
+the particle either moves one step left, one step right, or stays in place.
+
+The key measurable quantity is the mean square displacement (MSD) - the
+average of the squared distance all particles have traveled after a given
+time $t$. For free diffusion in one dimension:
+
+$$MSD(t) = 2Dt$$
+
+where $D$ is the diffusion coefficient. MSD grows linearly with time, so
+fitting a straight line to MSD vs. time recovers $D$ from the slope.
+
+### Encoding move probabilities with a look-up table
+
+A direct way to draw a random move each step would be using a random
+number generator (rng) to select from the three possible moves with the
+probability of moving in each direction:
+
+> ```python
+> p = diffusion_speed / sampling_period
+> direction = rng.choice([-1, 1, 0], p=[p, p, 1 - 2 * p])
+> ```
+
+However, calling `rng.choice` in a loop over thousands of particles and
+time steps is slow.
+
+Instead, a look-up table (LUT) `directions` of length `sampling_period`
+is pre-filled with moves:
+
+> ```python
+> directions = numpy.zeros(sampling_period)  # stay
+> directions[0:diffusion_speed] = 1  # move right
+> directions[diffusion_speed : diffusion_speed * 2] = -1  # move left
+> ```
+
+A single random integer in `[0, sampling_period)` is drawn per particle per
+time step and used to index the LUT. The result is the move for that step,
+with the same probabilities as `rng.choice` but using a single fast
+vectorized operation instead of a per-element Python call.
 """
 
 # %%
@@ -133,7 +182,8 @@ for particle in range(particles):
     # periods.
     moves = numpy.take(directions, random_numbers, axis=0)
 
-    # Set the first position of the particle to the origin
+    # Ensure the particle starts at the origin by setting the first move to
+    # zero.
     # TODO: the initial position could be randomized.
     moves[0] = 0
 
@@ -200,7 +250,9 @@ pyplot.title('Histogram of last particle position')
 pyplot.xlabel('position')
 pyplot.ylabel('frequency')
 minmax = numpy.max(numpy.abs(positions))
-pyplot.hist(positions[:, -1], numpy.arange(-minmax - 0.5, minmax + 0.5))
+pyplot.hist(
+    positions[:, -1], numpy.arange(-minmax - 0.5, minmax + 1.5).tolist()
+)
 pyplot.show()
 
 # %% [markdown]
@@ -218,7 +270,7 @@ pyplot.plot(time, slope * time, '-', lw=3, label='fit')
 pyplot.legend()
 pyplot.show()
 
-# %%
+# %% [markdown]
 """
 Remove all names defined above from the global namespace.
 Global names might interfere with following code.
